@@ -101,6 +101,14 @@ Run via cronjob tool:
 - **Broad then narrow** — cast a wide net, then rank by relevance
 - **Privacy-respecting** — no telemetry, no data collection, runs locally
 
+### Why Never Auto-Install?
+
+Auto-installing every discovered skill or tool would silently bloat your system — consuming disk space, memory, and startup time as hundreds of unused skills accumulate. Many discoveries are task-specific (e.g., a Terraform skill for one project) and have no business living on your machine permanently. By keeping discovery separate from installation, Skill Radar lets you:
+
+- **Stay lean** — only install what you actually use
+- **Stay in control** — review before anything touches your system
+- **Avoid dependency rot** — no orphaned skills piling up from one-off tasks
+
 ## License
 
 MIT
