@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.pytest_cache
+*.egg-info/
+dist/
+build/
+.venv/
+token.pickle
+__pycache__/
+*.swp
+*.swo
+*~
+.DS_Store
