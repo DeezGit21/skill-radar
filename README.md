@@ -62,15 +62,37 @@ skill-radar add-source my-awesome-skills https://github.com/myorg/awesome-skills
 ## Integrations
 
 ### Hermes Agent (installed as a skill)
-When loaded as a Hermes skill (via `@skill-radar`), Skill Radar automatically runs before every task, searches for relevant skills, and presents them. No manual invocation needed.
+When loaded as a Hermes skill (via `@skill-radar`), Skill Radar discovers relevant skills for tasks. No manual invocation needed.
 
-### Cron Job (periodic discovery)
+### Cron Setup (Periodic Discovery)
+
+Skill Radar has a `cron-scan` mode that finds **new** skills — ones it hasn't seen in previous scans, so you only get fresh results each time.
+
+**Linux / macOS (cron)**
 ```bash
-# Every Monday at 9 AM
-skill-radar cron-scan | while IFS= read -r line; do
-  echo "$line"
-done | mail -s "Skill Radar: New Discoveries" you@email.com
+# Every 3 days at 8 AM
+crontab -e
+# Add:
+0 8 */3 * * cd /path/to/skill-radar && skill-radar cron-scan >> ~/.skill-radar-cron.log 2>&1
 ```
+
+**Hermes Agent (built-in cron)**
+```
+Run via cronjob tool:
+  schedule: "0 7 */3 * *"
+  skills: ["skill-radar"]
+  prompt: "Run skill-radar cron-scan and report new discoveries."
+```
+
+**Custom intervals reference**
+
+| Interval | Cron expression | systemd timer | launchd seconds |
+|----------|----------------|---------------|-----------------|
+| Daily | `0 8 * * *` | `OnCalendar=daily` | 86400 |
+| Every 2 days | `0 8 */2 * *` | `OnCalendar=*-*-*/2` | 172800 |
+| Every 3 days | `0 8 */3 * *` | `OnCalendar=*-*-*/3` | 259200 |
+| Weekly (Mon) | `0 8 * * 1` | `OnCalendar=weekly` | 604800 |
+| Biweekly | `0 8 1,15 * *` | `OnCalendar=*-*-1,15` | 1209600 |
 
 ## Design Philosophy
 
