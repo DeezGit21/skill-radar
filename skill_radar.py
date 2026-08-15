@@ -58,6 +58,18 @@ DEFAULT_SOURCES = {
         "sort": "stars",
         "url": "https://api.github.com/search/repositories",
         "enabled": True
+    },
+    "hermes-skills-hub": {
+        "type": "url",
+        "url": "https://hermes-agent.nousresearch.com/docs/skills",
+        "query": "Hermes Agent Skills Hub",
+        "enabled": True
+    },
+    "hermes-skills-sitemap": {
+        "type": "url",
+        "url": "https://hermes-agent.nousresearch.com/docs/sitemap.xml",
+        "query": "Hermes Agent skill sitemap",
+        "enabled": True
     }
 }
 
@@ -282,13 +294,31 @@ def discover(task_desc, max_results=15):
         elif source_type == "mcp":
             results = search_mcp_registry(task_desc)
         elif source_type == "url":
-            # Fetch from URL and parse markdown links
+            # Fetch from URL and parse links
             try:
                 r = subprocess.run(["curl", "-sL", source["url"]],
                                    capture_output=True, text=True, timeout=15)
                 if r.returncode == 0:
-                    links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', r.stdout)
-                    for link_name, link_url in links[:20]:
+                    content = r.stdout
+                    # Try markdown links first [text](url)
+                    links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', content)
+                    # If few markdown links, try HTML links <a href="url">text</a>
+                    if len(links) < 5:
+                        html_links = re.findall(
+                            r'<a\s+(?:[^>]*?\s+)?href="([^"]+)"[^>]*>([^<]+)</a>',
+                            content, re.IGNORECASE
+                        )
+                        for url, text in html_links:
+                            if not url.startswith(('javascript:', '#', 'mailto:')):
+                                links.append((text.strip(), url))
+                    # Try XML sitemap <loc> entries
+                    if len(links) < 5:
+                        locs = re.findall(r'<loc>([^<]+)</loc>', content)
+                        for loc_url in locs[:50]:
+                            # Extract a readable name from the URL
+                            name = loc_url.rstrip('/').split('/')[-1].replace('-', ' ').title()
+                            links.append((name, loc_url))
+                    for link_name, link_url in links[:50]:
                         results.append({
                             "name": link_name,
                             "url": link_url,
