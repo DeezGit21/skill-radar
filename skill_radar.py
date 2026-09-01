@@ -95,10 +95,10 @@ def save_json(path, data):
         json.dump(data, f, indent=2)
 
 
-def github_search(query, sort="stars", per_page=10):
+def github_search(query, sort="stars", per_page=15):
     """Search GitHub repositories via CLI."""
     result = subprocess.run(
-        ["gh", "api", "search/repositories",
+        ["gh", "api", "-X", "GET", "search/repositories",
          "-f", f"q={query}",
          "-f", f"sort={sort}",
          "-f", f"per_page={per_page}"],
@@ -404,22 +404,30 @@ def cron_scan():
     if KNOWN_SKILLS_FILE.exists():
         known = set(load_json(KNOWN_SKILLS_FILE))
 
-    # Search broadly
-    queries = [
-        "claude-code skill OR agent skill OR MCP server created:>2025-01-01",
-        "hermes agent skill OR plugin OR tool",
-        "new MCP server OR model-context-protocol",
+    # Search broadly across multiple query vectors
+    searches = [
+        ("claude-code skill OR agent skill OR MCP server created:>2025-01-01", "stars", 15),
+        ("hermes agent skill OR plugin OR tool", "updated", 15),
+        ("topic:mcp-server", "updated", 15),
+        ("topic:claude-code-skill", "updated", 15),
+        ("topic:agent-skills", "updated", 15),
+        ("new MCP server OR model-context-protocol", "stars", 15),
     ]
 
     new_discoveries = []
-    for query in queries:
+    seen_urls = set()
+
+    for query, sort_by, per_page in searches:
         try:
-            results = github_search(query)
+            results = github_search(query, sort=sort_by, per_page=per_page)
             for r in results:
                 name = r["name"]
-                if name not in known:
+                url = r["url"]
+                if name not in known and url not in seen_urls:
                     r["discovery_date"] = datetime.now().isoformat()
+                    r["category"] = categorize(r)
                     new_discoveries.append(r)
+                    seen_urls.add(url)
         except Exception:
             continue
 
@@ -428,14 +436,25 @@ def cron_scan():
         known.add(r["name"])
     save_json(KNOWN_SKILLS_FILE, sorted(known))
 
-    # Present new discoveries
+    # Present new discoveries grouped by category
     if new_discoveries:
         print("\n📡 SKILL RADAR — New Discoveries\n")
-        for r in sorted(new_discoveries, key=lambda x: x.get("stars", 0), reverse=True)[:20]:
-            print(f"  🆕 {r['name']} ★{r.get('stars',0)}")
-            print(f"     {r.get('description','')[:120]}")
-            print(f"     🔗 {r['url']}")
-            print()
+        by_category = {}
+        for r in new_discoveries:
+            cat = r.get("category", "Other")
+            by_category.setdefault(cat, []).append(r)
+
+        for cat in ["MCP Server", "Agent Skill", "Claude Skill", "Tool", "Plugin", "Cursor Rule", "Other"]:
+            if cat not in by_category:
+                continue
+            items = sorted(by_category[cat], key=lambda x: x.get("stars", 0), reverse=True)
+            print(f"=== {cat}s ({len(items)}) ===")
+            for item in items:
+                print(f"  🆕 {item['name']} ★{item.get('stars',0)}")
+                print(f"     {item.get('description','')[:140]}")
+                print(f"     🔗 {item['url']}")
+                print()
+
         print(f"Total new discoveries this scan: {len(new_discoveries)}")
         print("Run with --install <name> to install any item.")
     else:
