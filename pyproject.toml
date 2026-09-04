@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "skill-radar"
-version = "1.0.0"
+version = "1.2.0"
 description = "AI Agent Skill Discovery Tool — finds relevant skills, MCP servers, and tools for any task"
 readme = "README.md"
 license = { text = "MIT" }

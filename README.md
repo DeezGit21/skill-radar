@@ -7,6 +7,7 @@ Skill Radar automatically searches GitHub, MCP registries, and skill directories
 ## Features
 
 - 🔍 **Task-driven discovery**: Describe what you want to do → get ranked recommendations
+- 🛡️ **Safety star threshold**: Only repositories with at least 100 stars (★100+) are recommended to filter out malware and low-reputation code
 - 📡 **Cron scan mode**: Periodic discovery of new skills (run on a schedule)
 - 🏷️ **Smart categorization**: Groups results into MCP Servers, Agent Skills, Tools, Plugins
 - ⭐ **Relevance scoring**: Scores by keyword match + GitHub stars + recency
@@ -19,10 +20,13 @@ Skill Radar automatically searches GitHub, MCP registries, and skill directories
 # Install
 pip install -e .
 
-# Search for skills relevant to your task
+# Search for skills relevant to your task (defaults to 100+ stars minimum)
 skill-radar discover "Build a Next.js SaaS with Stripe and Supabase"
 
-# Cron-friendly periodic scan
+# Customize star threshold if desired
+skill-radar discover "Build a Next.js app" --min-stars 250
+
+# Cron-friendly periodic scan (100+ stars minimum)
 skill-radar cron-scan
 
 # Output as JSON (for programmatic use)
@@ -97,6 +101,7 @@ Run via cronjob tool:
 ## Design Philosophy
 
 - **Recommend, don't install** — the user stays in control
+- **Safety by default (100+ stars)** — requires at least 100 stars on GitHub repos to guard against untested, malicious, or throwaway projects
 - **Transparent scoring** — each result shows why it was suggested
 - **Broad then narrow** — cast a wide net, then rank by relevance
 - **Privacy-respecting** — no telemetry, no data collection, runs locally

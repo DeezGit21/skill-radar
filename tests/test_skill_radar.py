@@ -13,7 +13,28 @@ from skill_radar import (
     score_relevance,
     categorize,
     deduplicate,
+    filter_by_min_stars,
 )
+
+
+class TestFilterStars:
+    def test_filter_github_under_min_stars(self):
+        items = [
+            {"name": "org/repo-low", "url": "https://github.com/org/repo-low", "stars": 5, "source": "github"},
+            {"name": "org/repo-high", "url": "https://github.com/org/repo-high", "stars": 150, "source": "github"},
+        ]
+        filtered = filter_by_min_stars(items, min_stars=100)
+        assert len(filtered) == 1
+        assert filtered[0]["name"] == "org/repo-high"
+
+    def test_filter_preserves_non_github_docs(self):
+        items = [
+            {"name": "Docs Page", "url": "https://example.com/docs", "stars": 0, "source": "url"},
+            {"name": "org/repo-low", "url": "https://github.com/org/repo-low", "stars": 2, "source": "github"},
+        ]
+        filtered = filter_by_min_stars(items, min_stars=100)
+        assert len(filtered) == 1
+        assert filtered[0]["name"] == "Docs Page"
 
 
 class TestKeywords:

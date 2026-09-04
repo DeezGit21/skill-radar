@@ -1,7 +1,7 @@
 ---
 name: skill-radar
-description: "Auto-discovers relevant skills, MCP servers, and tools from external sources (GitHub, registries) for any task — presents them for approval. No auto-install."
-version: 1.0.0
+description: "Auto-discovers relevant skills, MCP servers, and tools from external sources (GitHub, registries) for any task — presents them for approval. Enforces 100+ stars minimum on GitHub repos. No auto-install."
+version: 1.2.0
 tags: ["discovery", "recommendation", "skills", "mcp", "tools"]
 risk: safe
 ---
@@ -34,8 +34,10 @@ Use this skill when:
    - Keyword relevance to your task
    - GitHub stars (community popularity)
    - Recency of updates
-4. Groups results by category (MCP Server, Agent Skill, Tool, Plugin, etc.)
-5. Presents them for your approval
+4. Enforces safety & quality threshold:
+   - **Only repositories with at least 100 stars (★100+) are recommended** to prevent surfacing low-reputation or potentially harmful repositories.
+5. Groups results by category (MCP Server, Agent Skill, Tool, Plugin, etc.)
+6. Presents them for your approval
 
 **Skill Radar NEVER auto-installs.** Every recommendation includes the exact command to install, but you run it yourself.
 

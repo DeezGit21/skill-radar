@@ -29,6 +29,7 @@ SOURCES_FILE = CONFIG_DIR / "sources.json"
 CACHE_FILE = CONFIG_DIR / "cache.json"
 HISTORY_FILE = CONFIG_DIR / "history.json"
 KNOWN_SKILLS_FILE = CONFIG_DIR / "known_skills.json"
+DEFAULT_MIN_STARS = 100
 
 DEFAULT_SOURCES = {
     "github:top-agent-skills": {
@@ -265,8 +266,28 @@ def deduplicate(results):
     return unique
 
 
+def filter_by_min_stars(results, min_stars=DEFAULT_MIN_STARS):
+    """Filter out repositories/items with fewer than min_stars.
+    
+    Items with source == 'github' are strictly filtered if stars < min_stars.
+    Items without GitHub URLs (e.g. non-GitHub docs/registries) are preserved.
+    """
+    filtered = []
+    for r in results:
+        stars = r.get("stars", 0)
+        source = r.get("source", "")
+        url = r.get("url", "")
+        is_github = source == "github" or "github.com" in url
+        if is_github:
+            if stars >= min_stars:
+                filtered.append(r)
+        else:
+            filtered.append(r)
+    return filtered
+
+
 # ── Main discovery function ─────────────────────────────────────────
-def discover(task_desc, max_results=15):
+def discover(task_desc, max_results=15, min_stars=DEFAULT_MIN_STARS):
     """Run discovery across all enabled sources for a given task."""
     ensure_config()
     sources = load_json(SOURCES_FILE)
@@ -274,6 +295,8 @@ def discover(task_desc, max_results=15):
 
     print(f"🔍 Skill Radar — Searching for: {task_desc}")
     print(f"   Keywords: {', '.join(task_keywords[:6])}")
+    if min_stars > 0:
+        print(f"   Min Stars: ★{min_stars}+")
     print()
 
     all_results = []
@@ -287,9 +310,13 @@ def discover(task_desc, max_results=15):
         if source_type == "github_search":
             # For task relevance, use keywords as additional search terms
             query = source["query"]
+            if min_stars > 0:
+                query = f"({query}) stars:>={min_stars}"
+            else:
+                query = f"({query})"
             if task_keywords:
                 keyword_terms = " OR ".join(task_keywords[:3])
-                query = f"({query}) AND ({keyword_terms})"
+                query = f"{query} AND ({keyword_terms})"
             results = github_search(query)
         elif source_type == "mcp":
             results = search_mcp_registry(task_desc)
@@ -336,6 +363,10 @@ def discover(task_desc, max_results=15):
 
         all_results.extend(results)
         print(f"     → {len(results)} results found")
+
+    # Filter by minimum stars for GitHub repositories
+    if min_stars > 0:
+        all_results = filter_by_min_stars(all_results, min_stars=min_stars)
 
     # Deduplicate, sort by relevance, limit
     all_results = deduplicate(all_results)
@@ -397,21 +428,22 @@ def present_results(results, task_desc):
 
 
 # ── Cron scan mode ──────────────────────────────────────────────────
-def cron_scan():
+def cron_scan(min_stars=DEFAULT_MIN_STARS):
     """Periodic discovery — finds NEW skills not seen before."""
     ensure_config()
     known = set()
     if KNOWN_SKILLS_FILE.exists():
         known = set(load_json(KNOWN_SKILLS_FILE))
 
-    # Search broadly across multiple query vectors
+    # Search broadly across multiple query vectors (filtered by min_stars)
+    star_filter = f"stars:>={min_stars}" if min_stars > 0 else ""
     searches = [
-        ("claude-code skill OR agent skill OR MCP server created:>2025-01-01", "stars", 15),
-        ("hermes agent skill OR plugin OR tool", "updated", 15),
-        ("topic:mcp-server", "updated", 15),
-        ("topic:claude-code-skill", "updated", 15),
-        ("topic:agent-skills", "updated", 15),
-        ("new MCP server OR model-context-protocol", "stars", 15),
+        (f"claude-code skill OR agent skill OR MCP server created:>2025-01-01 {star_filter}".strip(), "stars", 15),
+        (f"hermes agent skill OR plugin OR tool {star_filter}".strip(), "updated", 15),
+        (f"topic:mcp-server {star_filter}".strip(), "updated", 15),
+        (f"topic:claude-code-skill {star_filter}".strip(), "updated", 15),
+        (f"topic:agent-skills {star_filter}".strip(), "updated", 15),
+        (f"new MCP server OR model-context-protocol {star_filter}".strip(), "stars", 15),
     ]
 
     new_discoveries = []
@@ -420,6 +452,8 @@ def cron_scan():
     for query, sort_by, per_page in searches:
         try:
             results = github_search(query, sort=sort_by, per_page=per_page)
+            if min_stars > 0:
+                results = filter_by_min_stars(results, min_stars=min_stars)
             for r in results:
                 name = r["name"]
                 url = r["url"]
@@ -499,11 +533,13 @@ Examples:
     disc = subparsers.add_parser("discover", help="Search for skills relevant to a task")
     disc.add_argument("task", type=str, nargs="+", help="Task description")
     disc.add_argument("--max", type=int, default=15, help="Max results (default: 15)")
+    disc.add_argument("--min-stars", type=int, default=DEFAULT_MIN_STARS, help=f"Minimum GitHub stars (default: {DEFAULT_MIN_STARS})")
     disc.add_argument("--install", type=str, metavar="NAME", help="Show install instructions for a result")
     disc.add_argument("--json", action="store_true", help="Output as JSON")
 
     # cron-scan
-    subparsers.add_parser("cron-scan", help="Periodic discovery scan (cron-friendly)")
+    cron_p = subparsers.add_parser("cron-scan", help="Periodic discovery scan (cron-friendly)")
+    cron_p.add_argument("--min-stars", type=int, default=DEFAULT_MIN_STARS, help=f"Minimum GitHub stars (default: {DEFAULT_MIN_STARS})")
 
     # list-sources
     subparsers.add_parser("list-sources", help="Show configured sources")
@@ -527,7 +563,7 @@ Examples:
 
     if args.command == "discover":
         task = " ".join(args.task)
-        results = discover(task, max_results=args.max)
+        results = discover(task, max_results=args.max, min_stars=args.min_stars)
 
         if args.json:
             print(json.dumps(results, indent=2))
@@ -542,7 +578,7 @@ Examples:
             present_results(results, task)
 
     elif args.command == "cron-scan":
-        cron_scan()
+        cron_scan(min_stars=args.min_stars)
 
     elif args.command == "list-sources":
         ensure_config()
