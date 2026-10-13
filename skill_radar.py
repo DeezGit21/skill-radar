@@ -218,16 +218,18 @@ def categorize(item):
     """Categorize a result based on its name and description."""
     text = f"{item.get('name','')} {item.get('description','')}".lower()
 
-    if "mcp" in text or "model-context" in text:
-        return "MCP Server"
     if "skill" in text:
+        if "claude" in text:
+            return "Claude Skill"
         return "Agent Skill"
     if "plugin" in text:
         return "Plugin"
-    if "tool" in text or "cli" in text:
-        return "Tool"
     if ".cursorrules" in text or "cursor" in text:
         return "Cursor Rule"
+    if "mcp" in text or "model-context" in text:
+        return "MCP Server"
+    if "tool" in text or "cli" in text:
+        return "Tool"
     if "claude" in text:
         return "Claude Skill"
     return "Other"
@@ -438,12 +440,19 @@ def cron_scan(min_stars=DEFAULT_MIN_STARS):
     # Search broadly across multiple query vectors (filtered by min_stars)
     star_filter = f"stars:>={min_stars}" if min_stars > 0 else ""
     searches = [
-        (f"claude-code skill OR agent skill OR MCP server created:>2025-01-01 {star_filter}".strip(), "stars", 15),
+        # AGENT SKILLS & Skill collections first
+        (f"topic:agent-skills {star_filter}".strip(), "stars", 15),
+        (f"topic:claude-code-skills {star_filter}".strip(), "stars", 15),
+        (f"topic:claude-code-skill {star_filter}".strip(), "stars", 15),
+        (f"topic:agent-skill {star_filter}".strip(), "stars", 15),
+        (f"awesome \"agent skills\" {star_filter}".strip(), "stars", 15),
+        (f"awesome \"claude skills\" {star_filter}".strip(), "stars", 15),
+        (f"\"agent skills\" {star_filter}".strip(), "stars", 15),
         (f"hermes agent skill OR plugin OR tool {star_filter}".strip(), "updated", 15),
-        (f"topic:mcp-server {star_filter}".strip(), "updated", 15),
-        (f"topic:claude-code-skill {star_filter}".strip(), "updated", 15),
-        (f"topic:agent-skills {star_filter}".strip(), "updated", 15),
-        (f"new MCP server OR model-context-protocol {star_filter}".strip(), "stars", 15),
+        # Standalone tools / CLIs for agents
+        (f"\"coding agent\" CLI OR tool {star_filter}".strip(), "stars", 15),
+        # MCP Servers (kept to a minimum)
+        (f"topic:mcp-server {star_filter}".strip(), "updated", 10),
     ]
 
     new_discoveries = []
@@ -470,7 +479,7 @@ def cron_scan(min_stars=DEFAULT_MIN_STARS):
         known.add(r["name"])
     save_json(KNOWN_SKILLS_FILE, sorted(known))
 
-    # Present new discoveries grouped by category
+    # Present new discoveries grouped by category (Skills first, MCPs capped at 2)
     if new_discoveries:
         print("\n📡 SKILL RADAR — New Discoveries\n")
         by_category = {}
@@ -478,10 +487,12 @@ def cron_scan(min_stars=DEFAULT_MIN_STARS):
             cat = r.get("category", "Other")
             by_category.setdefault(cat, []).append(r)
 
-        for cat in ["MCP Server", "Agent Skill", "Claude Skill", "Tool", "Plugin", "Cursor Rule", "Other"]:
+        for cat in ["Agent Skill", "Claude Skill", "Tool", "Plugin", "Cursor Rule", "MCP Server", "Other"]:
             if cat not in by_category:
                 continue
             items = sorted(by_category[cat], key=lambda x: x.get("stars", 0), reverse=True)
+            if cat == "MCP Server":
+                items = items[:2]
             print(f"=== {cat}s ({len(items)}) ===")
             for item in items:
                 print(f"  🆕 {item['name']} ★{item.get('stars',0)}")
